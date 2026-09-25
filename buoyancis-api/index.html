@@ -4,6 +4,21 @@
   <meta charset="UTF-8">
   <title>Buoyancis - Privacy Affordability Verifier</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .btn-secondary {
+      border: 1px solid rgb(71 85 105);
+      border-radius: 0.5rem;
+      padding: 0.375rem 0.625rem;
+      color: rgb(148 163 184);
+      font-size: 0.75rem;
+      line-height: 1rem;
+      transition: color 150ms ease, border-color 150ms ease;
+    }
+    .btn-secondary:hover {
+      color: rgb(226 232 240);
+      border-color: rgb(100 116 139);
+    }
+  </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-8 flex flex-col items-center justify-center space-y-6">
 
@@ -26,9 +41,12 @@
         <input id="rentInput" type="number" value="1200" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-sky-500">
       </div>
       
-      <button onclick="runVerification()" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-900 font-bold py-3 rounded-lg transition duration-200 shadow-lg shadow-sky-500/20">
+      <button id="runVerificationButton" onclick="runVerification()" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-900 font-bold py-3 rounded-lg transition duration-200 shadow-lg shadow-sky-500/20">
         Connect Bank & Generate Verification Proof
       </button>
+      <p id="connectionHint" class="hidden text-xs text-slate-400 text-center" role="status">
+        First connection may take 10-15s while secure environment initializes...
+      </p>
     </div>
 
     <div id="resultBox" class="hidden border-t border-slate-700 pt-6 space-y-4">
@@ -46,7 +64,7 @@
       <div>
         <div class="flex justify-between items-center mb-2">
           <p class="text-xs font-semibold text-slate-400">Signed Verification Payload (Privacy-Preserved)</p>
-          <button onclick="copyPayload()" class="text-xs text-sky-400 hover:underline">Copy Payload</button>
+          <button type="button" id="copyVerificationPayload" class="btn-secondary">Copy Verification Payload</button>
         </div>
         <pre id="jsonPayload" class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto border border-slate-800"></pre>
       </div>
@@ -65,18 +83,28 @@
     </button>
 
     <div id="landlordResult" class="hidden mt-4 p-4 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono"></div>
+    <button type="button" id="copyVerificationCertificate" onclick="copyVerificationCertificate()" class="hidden mt-3 text-xs text-sky-400 hover:underline">
+      Copy Verification Certificate
+    </button>
   </div>
 
   <script>
     let currentPayload = null;
 
     async function runVerification() {
+      const verifyButton = document.getElementById('runVerificationButton');
+      const connectionHint = document.getElementById('connectionHint');
       const rent = document.getElementById('rentInput').value;
       const resBox = document.getElementById('resultBox');
       const statusBadge = document.getElementById('statusBadge');
       const statusText = document.getElementById('statusText');
       const pvText = document.getElementById('pvText');
       const jsonPayload = document.getElementById('jsonPayload');
+
+      verifyButton.disabled = true;
+      verifyButton.textContent = 'Connecting to Open Banking API (Waking up server...)';
+      verifyButton.classList.add('opacity-60', 'cursor-not-allowed');
+      const hintTimer = setTimeout(() => connectionHint.classList.remove('hidden'), 5000);
 
       try {
         const response = await fetch('https://buoyancis-api.onrender.com/api/verify', {
@@ -103,6 +131,9 @@
           rent: data.rent,
           required_threshold: data.required_threshold,
           pv_discounted_inflows: data.pv_discounted_inflows,
+          timestamp: data.timestamp,
+          nonce: data.nonce,
+          payload_hash: data.payload_hash,
           issued_at: data.issued_at,
           expires_at: data.expires_at,
           security_metadata: data.security_metadata
@@ -113,24 +144,64 @@
 
       } catch (err) {
         alert("API Connection Error. Make sure app.py is running on port 5001!");
+      } finally {
+        clearTimeout(hintTimer);
+        connectionHint.classList.add('hidden');
+        verifyButton.disabled = false;
+        verifyButton.textContent = 'Connect Bank & Generate Verification Proof';
+        verifyButton.classList.remove('opacity-60', 'cursor-not-allowed');
       }
     }
 
-    function copyPayload() {
-      if (currentPayload) {
-        navigator.clipboard.writeText(JSON.stringify(currentPayload, null, 2));
-        alert("Payload copied to clipboard!");
-      }
+    const copyBtn = document.getElementById("copyVerificationPayload");
+    const payloadField = document.getElementById("jsonPayload");
+    let copyResetTimer;
+
+    if (copyBtn && payloadField) {
+      copyBtn.addEventListener("click", async () => {
+        const text = payloadField.value || payloadField.textContent;
+        if (!text) return;
+
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            const fallbackField = document.createElement("textarea");
+            fallbackField.value = text;
+            fallbackField.setAttribute("readonly", "");
+            fallbackField.style.position = "fixed";
+            fallbackField.style.opacity = "0";
+            document.body.appendChild(fallbackField);
+            fallbackField.select();
+            const copied = document.execCommand("copy");
+            fallbackField.remove();
+            if (!copied) throw new Error("Clipboard copy command failed");
+          }
+
+          copyBtn.textContent = "Copied!";
+          clearTimeout(copyResetTimer);
+          copyResetTimer = setTimeout(() => {
+            copyBtn.textContent = "Copy Verification Payload";
+          }, 2000);
+        } catch (err) {
+          console.error("Copy failed", err);
+        }
+      });
     }
 
     function verifyByLandlord() {
       const input = document.getElementById('landlordInput').value;
       const resDiv = document.getElementById('landlordResult');
+      const certificateBtn = document.getElementById('copyVerificationCertificate');
+      certificateBtn.classList.add('hidden');
       resDiv.classList.remove('hidden');
 
       try {
         const parsed = JSON.parse(input);
         if (parsed.status === "PASS" && parsed.verification_id) {
+          certificateBtn.dataset.timestamp = parsed.timestamp || parsed.issued_at || "Unavailable";
+          certificateBtn.dataset.proofHash = parsed.payload_hash || "Unavailable";
+          certificateBtn.classList.remove('hidden');
           resDiv.innerHTML = `<span class="text-emerald-400 font-bold">✓ VERIFICATION VALID</span><br>
           <span class="text-slate-400">ID: ${parsed.verification_id}</span><br>
           <span class="text-slate-400">Expires: ${parsed.expires_at}</span><br>
@@ -140,6 +211,55 @@
         }
       } catch (e) {
         resDiv.innerHTML = `<span class="text-rose-400">Invalid JSON Format.</span>`;
+      }
+    }
+
+    let certificateResetTimer;
+
+    async function copyVerificationCertificate() {
+      const button = document.getElementById('copyVerificationCertificate');
+      const rawTimestamp = button.dataset.timestamp || "Unavailable";
+      const timestampValue = Number(rawTimestamp);
+      const timestampDate = new Date(timestampValue);
+      const timestamp = Number.isFinite(timestampValue) && Number.isFinite(timestampDate.getTime())
+        ? timestampDate.toISOString()
+        : rawTimestamp;
+      const certificate = [
+        "Official Buoyancis Verification Proof",
+        "Status: PASS (Eligible)",
+        `Timestamp: ${timestamp}`,
+        `Verification Hash: ${button.dataset.proofHash || "Unavailable"}`,
+        "Verified via buoyancis.com"
+      ].join("\n");
+
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(certificate);
+        } else {
+          const fallbackField = document.createElement('textarea');
+          fallbackField.value = certificate;
+          fallbackField.setAttribute('readonly', '');
+          fallbackField.style.position = 'fixed';
+          fallbackField.style.left = '0';
+          fallbackField.style.top = '0';
+          fallbackField.style.fontSize = '16px';
+          fallbackField.style.opacity = '0';
+          document.body.appendChild(fallbackField);
+          fallbackField.focus();
+          fallbackField.select();
+          fallbackField.setSelectionRange(0, fallbackField.value.length);
+          const copied = document.execCommand('copy');
+          fallbackField.remove();
+          if (!copied) throw new Error('Clipboard copy command failed');
+        }
+
+        button.textContent = 'Copied!';
+        clearTimeout(certificateResetTimer);
+        certificateResetTimer = setTimeout(() => {
+          button.textContent = 'Copy Verification Certificate';
+        }, 2000);
+      } catch (err) {
+        console.error('Certificate copy failed', err);
       }
     }
   </script>
