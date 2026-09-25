@@ -67,6 +67,16 @@ SANDBOX_PATH = os.path.expanduser("~/Desktop/Buoyancis/sandbox_gocardless.json")
 @app.route("/api/verify", methods=["POST"])
 def verify_affordability():
     data = request.get_json() or {}
+    provider = data.get("provider", "sandbox_mock")
+    mock_sources = {
+        "revolut": {"provider": "Revolut", "source": "Revolut AISP Verified"},
+        "wise": {"provider": "Wise", "source": "Wise AISP Verified"},
+        "swedbank": {"provider": "Swedbank", "source": "Swedbank AISP Verified"},
+        "sandbox_mock": {"provider": "Sandbox Mock", "source": "Sandbox Mock AISP Verified"},
+    }
+    if not isinstance(provider, str) or provider not in mock_sources:
+        return jsonify({"error": "Unsupported provider"}), 400
+
     rent = float(data.get("rent", 1200.0))
     
     # 优先读取前端传入的数据，若无则读取本地 GoCardless 沙盒 JSON 文件
@@ -111,6 +121,8 @@ def verify_affordability():
         "required_threshold": res.get("required_threshold", res.get("threshold", rent * 3.0)),
         "pv_discounted_inflows": res.get("pv_discounted_inflows", res.get("pv_inflows", 0.0)),
         "verification_id": f"proof_byc_{os.urandom(4).hex()}",
+        "provider": provider,
+        "mock_source": mock_sources[provider],
         "timestamp": int(now.timestamp() * 1000),
         "nonce": secrets.token_urlsafe(16),
         "issued_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
