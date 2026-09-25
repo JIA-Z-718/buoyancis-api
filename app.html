@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Buoyancis - Privacy Affordability Verifier</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-8 flex flex-col items-center justify-center">
+
+  <div class="max-w-2xl w-full bg-slate-800 rounded-xl p-6 shadow-2xl border border-slate-700">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-bold text-sky-400">Buoyancis Protocol</h1>
+      <span class="bg-sky-500/10 text-sky-400 text-xs px-2.5 py-1 rounded-full border border-sky-500/20">Open Banking MVP</span>
+    </div>
+
+    <!-- 租客配置区 -->
+    <div class="space-y-4 mb-6">
+      <div>
+        <label class="block text-sm font-medium text-slate-300 mb-1">Monthly Rent Amount (EUR)</label>
+        <input id="rentInput" type="number" value="1200" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-slate-100 focus:outline-none focus:border-sky-500">
+      </div>
+      
+      <button onclick="runVerification()" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-900 font-bold py-3 rounded-lg transition duration-200 shadow-lg shadow-sky-500/20">
+        Connect Bank & Generate Verification Proof
+      </button>
+    </div>
+
+    <!-- 验证结果展示区 -->
+    <div id="resultBox" class="hidden border-t border-slate-700 pt-6 space-y-4">
+      <div class="flex items-center justify-between p-4 rounded-lg" id="statusBadge">
+        <div>
+          <p class="text-xs text-slate-400">VERIFICATION STATUS</p>
+          <p id="statusText" class="text-xl font-bold"></p>
+        </div>
+        <div class="text-right">
+          <p class="text-xs text-slate-400">PV Discounted Inflows / Required Threshold</p>
+          <p id="pvText" class="text-sm font-mono text-slate-200"></p>
+        </div>
+      </div>
+
+      <!-- 证明 Payload 预览 -->
+      <div>
+        <p class="text-xs font-semibold text-slate-400 mb-2">Cryptographic Payload (Shared with Landlord)</p>
+        <pre id="jsonPayload" class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-emerald-400 overflow-x-auto border border-slate-800"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function runVerification() {
+      const rent = document.getElementById('rentInput').value;
+      const resBox = document.getElementById('resultBox');
+      const statusBadge = document.getElementById('statusBadge');
+      const statusText = document.getElementById('statusText');
+      const pvText = document.getElementById('pvText');
+      const jsonPayload = document.getElementById('jsonPayload');
+
+      try {
+        const response = await fetch('http://127.0.0.1:5001/api/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rent: parseFloat(rent) })
+        });
+        const data = await response.json();
+
+        resBox.classList.remove('hidden');
+        pvText.innerText = `€${data.pv_discounted_inflows} / €${data.required_threshold}`;
+        
+        if (data.status === 'PASS') {
+          statusBadge.className = "flex items-center justify-between p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400";
+          statusText.innerText = "✓ PASS (Affordable)";
+        } else {
+          statusBadge.className = "flex items-center justify-between p-4 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400";
+          statusText.innerText = "❌ FAIL (Insufficient Flow)";
+        }
+
+        // 显示对外证明 Payload
+        const publicPayload = {
+          verification_id: data.verification_id,
+          status: data.status,
+          rent: data.rent,
+          required_threshold: data.required_threshold,
+          pv_discounted_inflows: data.pv_discounted_inflows,
+          issued_at: data.issued_at,
+          expires_at: data.expires_at
+        };
+        jsonPayload.innerText = JSON.stringify(publicPayload, null, 2);
+
+      } catch (err) {
+        alert("API Connection Error. Make sure app.py is running!");
+      }
+    }
+  </script>
+</body>
+</html>

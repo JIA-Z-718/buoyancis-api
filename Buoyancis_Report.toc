@@ -1,0 +1,15 @@
+\contentsline {section}{\numberline {1}The Core Thesis}{2}{section.1}%
+\contentsline {section}{\numberline {2}The Core Thesis}{2}{section.2}%
+\contentsline {section}{\numberline {3}The Problem: The Trust Tax}{2}{section.3}%
+\contentsline {section}{\numberline {4}The Solution: The Buoyancis Formula}{2}{section.4}%
+\contentsline {section}{\numberline {5}Strategic Evolution (Go-to-Market)}{2}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Phase 1: High Stakes (Startups/VC)}{2}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Phase 2: Medium Stakes (Automotive/Home)}{2}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}Phase 3: High Frequency (Daily Consumer)}{2}{subsection.5.3}%
+\contentsline {section}{\numberline {6}Competitive Landscape}{2}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Direct Competitors}{2}{subsection.6.1}%
+\contentsline {subsection}{\numberline {6.2}The Buoyancis Moat}{2}{subsection.6.2}%
+\contentsline {section}{\numberline {7}The Ask}{2}{section.7}%
+\contentsline {section}{\numberline {8}Financial Safeguards}{2}{section.8}%
+\contentsline {subsection}{\numberline {8.1}The Trust Equation}{2}{subsection.8.1}%
+\contentsline {subsection}{\numberline {8.2}Staking Tiers}{2}{subsection.8.2}%

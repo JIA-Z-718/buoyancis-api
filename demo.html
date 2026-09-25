@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buoyancis | Zero-Knowledge Rent Verification</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col items-center justify-center p-4">
+
+  <!-- Header Section -->
+  <header class="w-full max-w-4xl flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center font-bold text-slate-950 text-xl">B</div>
+      <span class="text-xl font-bold tracking-tight text-white">Buoyancis <span class="text-xs font-normal text-sky-400 bg-sky-950 border border-sky-800 px-2 py-0.5 rounded-full ml-2">Protocol MVP</span></span>
+    </div>
+    <div class="flex space-x-2 bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs">
+      <button id="tabTenant" onclick="switchTab('tenant')" class="px-4 py-1.5 rounded-md font-medium bg-sky-500 text-slate-950 transition">1. Tenant Portal (Generate)</button>
+      <button id="tabLandlord" onclick="switchTab('landlord')" class="px-4 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition">2. Landlord View (Verify)</button>
+    </div>
+  </header>
+
+  <main class="w-full max-w-4xl">
+    <!-- VIEW 1: TENANT PORTAL -->
+    <div id="viewTenant" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
+      <div>
+        <h2 class="text-lg font-semibold text-white">Step 1: Connect Bank & Prove Affordability</h2>
+        <p class="text-xs text-slate-400">Authorize read-only Open Banking data. Buoyancis evaluates $PV \ge 3R$ locally and issues a zero-knowledge credential without storing raw transactions.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-3">
+          <label class="block text-xs font-medium text-slate-400">Target Monthly Rent (EUR)</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 text-sm">€</span>
+            <input id="tenantRent" type="number" value="1200" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-7 pr-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+          </div>
+          <p class="text-[10px] text-slate-500">Required 90-Day PV Threshold (3x): <span id="calcThreshold" class="text-sky-400 font-mono">€3,600.00</span></p>
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl flex flex-col justify-between">
+          <span class="text-xs text-slate-400">Bank Integration Status</span>
+          <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-xs text-slate-200 font-medium">Nordigen / GoCardless Sandbox Connected</span>
+          </div>
+          <button onclick="runTenantVerify()" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-2.5 rounded-lg text-xs transition shadow-lg shadow-sky-500/20 mt-2">
+            Generate Verification Proof
+          </button>
+        </div>
+      </div>
+
+      <!-- Tenant Result Payload -->
+      <div id="tenantResult" class="hidden space-y-4 pt-4 border-t border-slate-800">
+        <div class="p-4 rounded-xl flex justify-between items-center bg-slate-950 border border-slate-800" id="tenantBadge">
+          <div>
+            <span class="text-[10px] text-slate-400 uppercase tracking-wider block">Verification Outcome</span>
+            <span id="tenantStatus" class="text-lg font-bold"></span>
+          </div>
+          <div class="text-right">
+            <span class="text-[10px] text-slate-400 block">Verification ID</span>
+            <span id="tenantProofId" class="text-xs font-mono text-sky-400"></span>
+          </div>
+        </div>
+        
+        <div>
+          <span class="text-xs text-slate-400 block mb-1">Pass this ID or link to your landlord:</span>
+          <div class="flex space-x-2">
+            <input id="shareLink" readonly type="text" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-emerald-400">
+            <button onclick="copyProofId()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg text-xs font-medium transition">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: LANDLORD VERIFIER -->
+    <div id="viewLandlord" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
+      <div>
+        <h2 class="text-lg font-semibold text-white">Landlord Portal: Verify Tenant Eligibility</h2>
+        <p class="text-xs text-slate-400">Instant financial verification in 60 seconds without accessing bank statements or private identity details.</p>
+      </div>
+
+      <div class="flex space-x-3">
+        <input id="landlordInputId" type="text" placeholder="Enter Proof ID (e.g. proof_byc_a1b2c3d4)" class="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-sky-500">
+        <button onclick="verifyLandlordView()" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-6 py-2.5 rounded-lg text-xs transition">Verify Proof</button>
+      </div>
+
+      <div id="landlordResultCard" class="hidden p-6 rounded-xl bg-slate-950 border border-slate-800 space-y-4">
+        <div class="flex justify-between items-start">
+          <div>
+            <span class="text-xs text-slate-400 block">TENANT VERIFICATION STATUS</span>
+            <h3 id="landlordStatusTitle" class="text-2xl font-bold mt-1"></h3>
+          </div>
+          <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] px-2.5 py-1 rounded-full font-mono">Cryptographically Validated</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 border-t border-slate-800 pt-4">
+          <div>
+            <span class="text-[10px] text-slate-500 block uppercase">Target Rent Required</span>
+            <span id="landlordRentReq" class="text-sm font-semibold text-slate-200"></span>
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-500 block uppercase">PV Flow Margin</span>
+            <span id="landlordMargin" class="text-sm font-semibold text-slate-200"></span>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-1">
+          <p class="text-emerald-400 font-semibold">✓ Privacy Safeguard Active</p>
+          <p>Zero bank transactions, employment identity, or account numbers revealed to landlord.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let currentProof = null;
+
+    function switchTab(tab) {
+      if(tab === 'tenant') {
+        document.getElementById('viewTenant').classList.remove('hidden');
+        document.getElementById('viewLandlord').classList.add('hidden');
+        document.getElementById('tabTenant').className = "px-4 py-1.5 rounded-md font-medium bg-sky-500 text-slate-950 transition";
+        document.getElementById('tabLandlord').className = "px-4 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition";
+      } else {
+        document.getElementById('viewTenant').classList.add('hidden');
+        document.getElementById('viewLandlord').classList.remove('hidden');
+        document.getElementById('tabLandlord').className = "px-4 py-1.5 rounded-md font-medium bg-sky-500 text-slate-950 transition";
+        document.getElementById('tabTenant').className = "px-4 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition";
+      }
+    }
+
+    async function runTenantVerify() {
+      const rent = document.getElementById('tenantRent').value;
+      try {
+        const response = await fetch('http://127.0.0.1:5002/api/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rent: parseFloat(rent) })
+        });
+        currentProof = await response.json();
+
+        document.getElementById('tenantResult').classList.remove('hidden');
+        document.getElementById('tenantProofId').innerText = currentProof.verification_id;
+        document.getElementById('shareLink').value = currentProof.verification_id;
+        
+        const badge = document.getElementById('tenantBadge');
+        const status = document.getElementById('tenantStatus');
+
+        if(currentProof.status === 'PASS') {
+          badge.className = "p-4 rounded-xl flex justify-between items-center bg-emerald-500/10 border border-emerald-500/20 text-emerald-400";
+          status.innerText = "✓ AFFORDABILITY VERIFIED";
+        } else {
+          badge.className = "p-4 rounded-xl flex justify-between items-center bg-rose-500/10 border border-rose-500/20 text-rose-400";
+          status.innerText = "❌ INSUFFICIENT FLOW";
+        }
+      } catch (err) {
+        alert("Make sure backend (app.py) is running on port 5002!");
+      }
+    }
+
+    function copyProofId() {
+      const input = document.getElementById('shareLink');
+      navigator.clipboard.writeText(input.value);
+      alert("Proof ID copied! Now switch to Landlord View to verify.");
+    }
+
+    function verifyLandlordView() {
+      const inputId = document.getElementById('landlordInputId').value.trim();
+      if(!currentProof || inputId !== currentProof.verification_id) {
+        alert("Invalid or expired Proof ID. Generate one in Tenant View first!");
+        return;
+      }
+
+      const card = document.getElementById('landlordResultCard');
+      const title = document.getElementById('landlordStatusTitle');
+      const req = document.getElementById('landlordRentReq');
+      const margin = document.getElementById('landlordMargin');
+
+      card.classList.remove('hidden');
+      req.innerText = `€${currentProof.rent} / month (Required 3R: €${currentProof.required_threshold})`;
+      margin.innerText = `€${currentProof.pv_discounted_inflows} Present Value`;
+
+      if(currentProof.status === 'PASS') {
+        title.innerText = "✓ TENANT APPROVED (PASS)";
+        title.className = "text-2xl font-bold mt-1 text-emerald-400";
+      } else {
+        title.innerText = "❌ TENANT REJECTED (FAIL)";
+        title.className = "text-2xl font-bold mt-1 text-rose-400";
+      }
+    }
+  </script>
+</body>
+</html>

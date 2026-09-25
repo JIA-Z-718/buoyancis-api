@@ -1,0 +1,66 @@
+{
+  "transactions": {
+    "booked": [
+      {
+        "transactionId": "tx_gc_001",
+        "bookingDate": "2026-09-06",
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "3200.00"
+        },
+        "creditorName": "Jiahao Zhang",
+        "debtorName": "Tech Corp AB",
+        "remittanceInformationUnstructured": "Salary payment 08/2026",
+        "proprietaryBankTransactionCode": "SALARY"
+      },
+      {
+        "transactionId": "tx_gc_002",
+        "bookingDate": "2026-08-01",
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "3200.00"
+        },
+        "creditorName": "Jiahao Zhang",
+        "debtorName": "Tech Corp AB",
+        "remittanceInformationUnstructured": "Salary payment 07/2026",
+        "proprietaryBankTransactionCode": "SALARY"
+      },
+      {
+        "transactionId": "tx_gc_003",
+        "bookingDate": "2026-07-01",
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "3200.00"
+        },
+        "creditorName": "Jiahao Zhang",
+        "debtorName": "Tech Corp AB",
+        "remittanceInformationUnstructured": "Salary payment 06/2026",
+        "proprietaryBankTransactionCode": "SALARY"
+      },
+      {
+        "transactionId": "tx_gc_004",
+        "bookingDate": "2026-09-05",
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "50000.00"
+        },
+        "creditorName": "Jiahao Zhang",
+        "debtorName": "Jiahao Zhang",
+        "remittanceInformationUnstructured": "Internal Transfer / Self Churn",
+        "proprietaryBankTransactionCode": "TRANSFER"
+      },
+      {
+        "transactionId": "tx_gc_005",
+        "bookingDate": "2026-05-15",
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "4000.00"
+        },
+        "creditorName": "Jiahao Zhang",
+        "debtorName": "Old Employer",
+        "remittanceInformationUnstructured": "Old Salary",
+        "proprietaryBankTransactionCode": "SALARY"
+      }
+    ]
+  }
+}
