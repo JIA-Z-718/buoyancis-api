@@ -130,6 +130,7 @@
 
   <script>
     let currentPayload = null;
+    let selectedProvider = null;
     let authTimer = null;
 
     function openBankModal() {
@@ -153,9 +154,9 @@
 
     function authenticateSelectedBank() {
       const selectedBank = document.querySelector('input[name="bankProvider"]:checked');
-      const provider = selectedBank ? selectedBank.value : null;
+      selectedProvider = selectedBank ? selectedBank.value : null;
       const error = document.getElementById('bankSelectionError');
-      if (!provider) {
+      if (!selectedProvider) {
         error.classList.remove('hidden');
         return;
       }
@@ -171,11 +172,11 @@
 
       authTimer = setTimeout(() => {
         closeBankModal();
-        runVerification(provider);
+        runVerification(selectedProvider);
       }, 2000);
     }
 
-    async function runVerification(provider) {
+    async function runVerification(selectedProvider) {
       const verifyButton = document.getElementById('runVerificationButton');
       const connectionHint = document.getElementById('connectionHint');
       const rent = document.getElementById('rentInput').value;
@@ -194,7 +195,10 @@
         const response = await fetch('https://buoyancis-api.onrender.com/api/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rent: parseFloat(rent), provider })
+          body: JSON.stringify({
+            rent: parseFloat(rent),
+            provider: selectedProvider || 'revolut'
+          })
         });
         const data = await response.json();
 

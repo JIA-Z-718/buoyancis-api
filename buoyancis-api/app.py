@@ -67,15 +67,20 @@ SANDBOX_PATH = os.path.expanduser("~/Desktop/Buoyancis/sandbox_gocardless.json")
 @app.route("/api/verify", methods=["POST"])
 def verify_affordability():
     data = request.get_json() or {}
-    provider = data.get("provider", "sandbox_mock")
-    mock_sources = {
-        "revolut": {"provider": "Revolut", "source": "Revolut AISP Verified"},
-        "wise": {"provider": "Wise", "source": "Wise AISP Verified"},
-        "swedbank": {"provider": "Swedbank", "source": "Swedbank AISP Verified"},
-        "sandbox_mock": {"provider": "Sandbox Mock", "source": "Sandbox Mock AISP Verified"},
+    provider_id = data.get("provider", "revolut")
+    providers = {
+        "revolut": "Revolut",
+        "wise": "Wise",
+        "swedbank": "Swedbank",
+        "sandbox_mock": "Sandbox Mock",
     }
-    if not isinstance(provider, str) or provider not in mock_sources:
+    if not isinstance(provider_id, str):
         return jsonify({"error": "Unsupported provider"}), 400
+    provider_id = provider_id.strip().lower()
+    provider_name = providers.get(provider_id)
+    if not provider_name:
+        return jsonify({"error": "Unsupported provider"}), 400
+    source = f"{provider_name} AISP Verified"
 
     rent = float(data.get("rent", 1200.0))
     
@@ -121,8 +126,9 @@ def verify_affordability():
         "required_threshold": res.get("required_threshold", res.get("threshold", rent * 3.0)),
         "pv_discounted_inflows": res.get("pv_discounted_inflows", res.get("pv_inflows", 0.0)),
         "verification_id": f"proof_byc_{os.urandom(4).hex()}",
-        "provider": provider,
-        "mock_source": mock_sources[provider],
+        "provider": provider_name,
+        "source": source,
+        "mock_source": {"provider": provider_name, "source": source},
         "timestamp": int(now.timestamp() * 1000),
         "nonce": secrets.token_urlsafe(16),
         "issued_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
