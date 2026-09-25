@@ -4,6 +4,8 @@ from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
+app = Flask(__name__)
+CORS(app)  # 允许跨域请求
 # 从 buoyancis_engine 导入最新的的核心计算引擎
 # 如果你保留了 parse_gocardless_and_evaluate 函数，这里同时兼容导入
 try:

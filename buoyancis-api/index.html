@@ -79,7 +79,7 @@
       const jsonPayload = document.getElementById('jsonPayload');
 
       try {
-        const response = await fetch('http://127.0.0.1:5001/api/verify', {
+        const response = await fetch('https://buoyancis-api.onrender.com', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rent: parseFloat(rent) })
