@@ -86,15 +86,15 @@
       <p class="mb-4 text-sm text-slate-400">Choose a bank to continue with the sandbox authorization demo.</p>
       <div class="space-y-2">
         <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-700 p-3 hover:border-sky-500">
-          <input type="radio" name="bankProvider" value="revolut" class="accent-sky-500">
+          <input type="radio" name="bank_provider" value="Revolut" class="accent-sky-500">
           <span><span class="block text-sm font-medium text-slate-100">Revolut</span><span class="text-xs text-slate-400">International</span></span>
         </label>
         <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-700 p-3 hover:border-sky-500">
-          <input type="radio" name="bankProvider" value="wise" class="accent-sky-500">
+          <input type="radio" name="bank_provider" value="Wise" class="accent-sky-500">
           <span><span class="block text-sm font-medium text-slate-100">Wise</span><span class="text-xs text-slate-400">Multi-currency</span></span>
         </label>
         <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-700 p-3 hover:border-sky-500">
-          <input type="radio" name="bankProvider" value="swedbank" class="accent-sky-500">
+          <input type="radio" name="bank_provider" value="Swedbank" class="accent-sky-500">
           <span><span class="block text-sm font-medium text-slate-100">Swedbank</span><span class="text-xs text-slate-400">Sweden</span></span>
         </label>
       </div>
@@ -153,14 +153,8 @@
     }
 
     function authenticateSelectedBank() {
-      const selectedBank = document.querySelector('input[name="bankProvider"]:checked');
-      selectedProvider = selectedBank ? selectedBank.value : null;
+      selectedProvider = document.querySelector('input[name="bank_provider"]:checked')?.value || 'Revolut';
       const error = document.getElementById('bankSelectionError');
-      if (!selectedProvider) {
-        error.classList.remove('hidden');
-        return;
-      }
-
       error.classList.add('hidden');
       document.getElementById('authenticateBankButton').disabled = true;
       const progress = document.getElementById('authProgress');
@@ -197,15 +191,15 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             rent: parseFloat(rent),
-            provider: selectedProvider || 'revolut'
+            provider: selectedProvider || 'Revolut'
           })
         });
-        const data = await response.json();
+        const responseData = await response.json();
 
         resBox.classList.remove('hidden');
-        pvText.innerText = `€${data.pv_discounted_inflows} / €${data.required_threshold}`;
+        pvText.innerText = `€${responseData.pv_discounted_inflows} / €${responseData.required_threshold}`;
         
-        if (data.status === 'PASS') {
+        if (responseData.status === 'PASS') {
           statusBadge.className = "flex items-center justify-between p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400";
           statusText.innerText = "✓ PASS (Affordable)";
         } else {
@@ -213,10 +207,11 @@
           statusText.innerText = "❌ FAIL (Insufficient Flow)";
         }
 
-        currentPayload = data;
+        currentPayload = responseData;
         
-        jsonPayload.innerText = JSON.stringify(currentPayload, null, 2);
-        document.getElementById('landlordInput').value = JSON.stringify(currentPayload, null, 2);
+        const formattedPayload = JSON.stringify(responseData, null, 2);
+        jsonPayload.textContent = formattedPayload;
+        document.getElementById('landlordInput').value = formattedPayload;
 
       } catch (err) {
         alert("API Connection Error. Make sure app.py is running on port 5001!");
