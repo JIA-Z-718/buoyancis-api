@@ -66,30 +66,31 @@ SANDBOX_PATH = os.path.expanduser("~/Desktop/Buoyancis/sandbox_gocardless.json")
 
 @app.route("/api/verify", methods=["POST"])
 def verify_affordability():
-    req_data = request.get_json(silent=True) or {}
-    if not isinstance(req_data, dict):
+    data = request.get_json(force=True, silent=True) or {}
+    if not isinstance(data, dict):
         return jsonify({"error": "Invalid request body"}), 400
 
-    chosen_bank = req_data.get("provider", "Revolut")
+    provider_name = data.get("provider") or "Revolut"
     providers = {
         "revolut": "Revolut",
         "wise": "Wise",
         "swedbank": "Swedbank",
         "sandbox_mock": "Sandbox Mock",
     }
-    if not isinstance(chosen_bank, str):
+    if not isinstance(provider_name, str):
         return jsonify({"error": "Unsupported provider"}), 400
-    chosen_bank = providers.get(chosen_bank.strip().lower())
-    if not chosen_bank:
+    provider_name = providers.get(provider_name.strip().lower())
+    if not provider_name:
         return jsonify({"error": "Unsupported provider"}), 400
-    source = f"{chosen_bank} AISP Verified"
+    print(f"[DEBUG] Received provider: {provider_name}")
+    source = f"{provider_name} AISP Verified"
 
-    rent = float(req_data.get("rent", 1200.0))
+    rent = float(data.get("rent", 1200.0))
     
     # 优先读取前端传入的数据，若无则读取本地 GoCardless 沙盒 JSON 文件
     gocardless_data = None
-    if "transactions_json" in req_data:
-        gocardless_data = req_data["transactions_json"]
+    if "transactions_json" in data:
+        gocardless_data = data["transactions_json"]
     else:
         try:
             if os.path.exists(SANDBOX_PATH):
@@ -128,9 +129,9 @@ def verify_affordability():
         "required_threshold": res.get("required_threshold", res.get("threshold", rent * 3.0)),
         "pv_discounted_inflows": res.get("pv_discounted_inflows", res.get("pv_inflows", 0.0)),
         "verification_id": f"proof_byc_{os.urandom(4).hex()}",
-        "provider": chosen_bank,
+        "provider": provider_name,
         "source": source,
-        "mock_source": {"provider": chosen_bank, "source": source},
+        "mock_source": {"provider": provider_name, "source": source},
         "timestamp": int(now.timestamp() * 1000),
         "nonce": secrets.token_urlsafe(16),
         "issued_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
