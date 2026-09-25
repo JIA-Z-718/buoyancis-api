@@ -83,7 +83,6 @@ def verify_affordability():
     if not provider_name:
         return jsonify({"error": "Unsupported provider"}), 400
     print(f"[DEBUG] Received provider: {provider_name}")
-    source = f"{provider_name} AISP Verified"
 
     rent = float(data.get("rent", 1200.0))
     
@@ -129,9 +128,6 @@ def verify_affordability():
         "required_threshold": res.get("required_threshold", res.get("threshold", rent * 3.0)),
         "pv_discounted_inflows": res.get("pv_discounted_inflows", res.get("pv_inflows", 0.0)),
         "verification_id": f"proof_byc_{os.urandom(4).hex()}",
-        "provider": provider_name,
-        "source": source,
-        "mock_source": {"provider": provider_name, "source": source},
         "timestamp": int(now.timestamp() * 1000),
         "nonce": secrets.token_urlsafe(16),
         "issued_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -143,7 +139,14 @@ def verify_affordability():
         }),
         "logs": res.get("processed_logs", res.get("logs", []))
     }
+    payload["provider"] = provider_name
+    payload["source"] = f"{provider_name} AISP Verified"
+    payload["mock_source"] = {
+        "provider": provider_name,
+        "source": payload["source"],
+    }
     payload["payload_hash"] = _payload_digest(payload)
+    print("--> FINAL PAYLOAD KEYS:", list(payload.keys()))
     return jsonify(payload)
 
 
