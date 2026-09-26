@@ -7,3 +7,13 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: TINK_CLIENT_ID
+        sync: false
+      - key: TINK_CLIENT_SECRET
+        sync: false
+      - key: TINK_REDIRECT_URI
+        value: https://buoyancis.com/callback
+      - key: TINK_ENV
+        value: sandbox
+      - key: PAYLOAD_SIGNING_SECRET
+        sync: false
