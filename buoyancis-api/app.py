@@ -26,9 +26,30 @@ PAYLOAD_SIGNING_SECRET = os.environ.get("PAYLOAD_SIGNING_SECRET", "sandbox_mock_
 ALLOWED_FRONTEND_ORIGIN = "https://buoyancis.com"
 
 
+def _normalize_json_numbers(value):
+    # JavaScript JSON.stringify serializes integral floats (e.g. 1200.0) as integers.
+    # Normalize them before HMAC so a proof survives a browser copy/paste round trip.
+    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        return int(value)
+    if isinstance(value, dict):
+        return {key: _normalize_json_numbers(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_normalize_json_numbers(item) for item in value]
+    return value
+
+
+def _canonical_payload_json(payload):
+    clean_payload = {
+        key: value
+        for key, value in payload.items()
+        if key not in {"payload_hash", "signature", "hmac_signature"}
+    }
+    clean_payload = _normalize_json_numbers(clean_payload)
+    return json.dumps(clean_payload, sort_keys=True, separators=(",", ":"))
+
+
 def _payload_digest(payload):
-    unsigned_payload = {key: value for key, value in payload.items() if key != "payload_hash"}
-    canonical_payload = json.dumps(unsigned_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    canonical_payload = _canonical_payload_json(payload)
     return hmac.new(
         PAYLOAD_SIGNING_SECRET.encode("utf-8"),
         canonical_payload.encode("utf-8"),
@@ -43,7 +64,7 @@ def _tink_state_serializer():
     )
 
 
-def _build_signed_payload(result, provider_name, source, currency=None, include_logs=True):
+def _build_signed_payload(result, provider_name, source, currency=None):
     now = datetime.now(timezone.utc)
     expires = now + timedelta(days=30)
     payload = {
@@ -61,11 +82,11 @@ def _build_signed_payload(result, provider_name, source, currency=None, include_
         "source": source,
         "mock_source": {"provider": provider_name, "source": source},
     }
-    if include_logs:
-        payload["logs"] = result.get("processed_logs", result.get("logs", []))
     if currency:
         payload["currency"] = currency
-    payload["payload_hash"] = _payload_digest(payload)
+    digest = _payload_digest(payload)
+    payload["payload_hash"] = digest
+    payload["signature"] = digest
     return payload
 
 
@@ -344,21 +365,52 @@ def tink_callback():
         provider_name,
         "Tink AISP Verified",
         currency,
-        include_logs=False,
     )
     return jsonify(payload), 200
 
 
+@app.route("/api/validate", methods=["POST"])
 @app.route("/api/verify-payload", methods=["POST"])
 def verify_payload():
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"status": "INVALID", "message": "Invalid request body"}), 400
     payload = data.get("payload", data)
-    if not isinstance(payload, dict) or not isinstance(payload.get("payload_hash"), str):
+    if not isinstance(payload, dict):
         return jsonify({"status": "INVALID", "message": "Missing or invalid signed payload"}), 400
 
+    client_signature = payload.get("payload_hash") or payload.get("signature")
+    if not isinstance(client_signature, str):
+        return jsonify({
+            "status": "INVALID",
+            "valid": False,
+            "reason": "Missing signature or payload_hash field",
+            "message": "Missing or invalid signed payload",
+        }), 400
     expected_hash = _payload_digest(payload)
-    if not hmac.compare_digest(payload["payload_hash"], expected_hash):
-        return jsonify({"status": "INVALID", "message": "Payload integrity check failed"}), 400
+    canonical_json = _canonical_payload_json(payload)
+    transaction_detail_keys = {"logs", "transactions", "accounts", "raw_amount", "eligible_amount"}
+    if transaction_detail_keys.intersection(payload):
+        print("[DEBUG VERIFY] Canonical JSON for verification: [REDACTED transaction details]")
+    else:
+        print("[DEBUG VERIFY] Canonical JSON for verification:", canonical_json)
+    print(f"[DEBUG VERIFY] Expected: {expected_hash}, Got: {client_signature}")
+
+    supplied_signatures = [
+        payload[key]
+        for key in ("signature", "hmac_signature", "payload_hash")
+        if key in payload
+    ]
+    if any(
+        not isinstance(signature, str) or not hmac.compare_digest(signature, expected_hash)
+        for signature in supplied_signatures
+    ):
+        return jsonify({
+            "status": "INVALID",
+            "valid": False,
+            "reason": "Hash Mismatch: Payload modified after issuance",
+            "message": "Payload integrity check failed",
+        }), 200
 
     timestamp = payload.get("timestamp")
     if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)):
@@ -379,6 +431,7 @@ def verify_payload():
 
     return jsonify({
         "status": "PASS",
+        "valid": True,
         "message": "Payload signature and timestamp are valid",
         "eligibility_status": payload.get("status"),
         "verification_id": payload.get("verification_id"),
