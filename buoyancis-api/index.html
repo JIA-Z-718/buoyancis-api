@@ -129,7 +129,16 @@
     <div id="landlordResult" class="hidden mt-4 p-4 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono"></div>
   </div>
 
+  <div id="tinkLoadingOverlay" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 p-6" role="status" aria-live="assertive" aria-busy="true">
+    <div class="text-center">
+      <div class="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-slate-700 border-t-sky-400"></div>
+      <p class="text-sm font-semibold text-sky-200">Fetching &amp; Verifying Open Banking Streams...</p>
+      <p class="mt-2 text-xs text-slate-400">This can take a few seconds.</p>
+    </div>
+  </div>
+
   <script>
+    const TINK_API_BASE = 'https://buoyancis-api.onrender.com';
     let currentPayload = null;
     let selectedProvider = null;
     let authTimer = null;
@@ -180,10 +189,10 @@
 
     async function beginTinkAuthorization(rent, currency, selectedProvider) {
       try {
-        const response = await fetch('https://buoyancis-api.onrender.com/api/tink/auth-url', {
+        const response = await fetch(`${TINK_API_BASE}/api/tink/auth-url`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rent: parseFloat(rent), currency })
+          body: JSON.stringify({ rent: parseFloat(rent), currency, provider: selectedProvider })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'Tink authorization setup failed');
@@ -447,15 +456,16 @@
       const state = callbackParams.get('state');
       if (callbackParams.has('error')) {
         window.history.replaceState({}, document.title, '/callback');
-        alert('Tink authorization was cancelled or could not be completed.');
+        showTinkCallbackError('Tink authorization was cancelled or could not be completed.');
         return;
       }
-      if (!code || !state) return;
+      if (!code) return;
 
       // Remove the one-time authorization code from the visible address bar before forwarding it.
       window.history.replaceState({}, document.title, '/callback');
+      document.getElementById('tinkLoadingOverlay').classList.remove('hidden');
       try {
-        const response = await fetch('https://buoyancis-api.onrender.com/api/tink/callback', {
+        const response = await fetch(`${TINK_API_BASE}/api/tink/callback`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code, state })
@@ -464,8 +474,18 @@
         if (!response.ok) throw new Error(result.error || 'Tink callback failed');
         renderTenantPayload(result);
       } catch (err) {
-        alert('Tink connection could not be completed. Please restart the authorization flow.');
+        showTinkCallbackError('Tink connection could not be completed. Please restart the authorization flow.');
+      } finally {
+        document.getElementById('tinkLoadingOverlay').classList.add('hidden');
       }
+    }
+
+    function showTinkCallbackError(message) {
+      const resultBox = document.getElementById('resultBox');
+      resultBox.classList.remove('hidden');
+      document.getElementById('statusBadge').className = 'rounded-lg border border-rose-500/30 bg-rose-500/10 p-4 text-rose-300';
+      document.getElementById('statusText').textContent = 'Tink connection failed';
+      document.getElementById('pvText').textContent = message;
     }
 
     handleTinkCallback();

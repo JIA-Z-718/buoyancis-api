@@ -230,8 +230,6 @@ def tink_auth_url():
             "status": "fallback",
             "message": "Tink credentials are not configured; continue with Mock AISP.",
         }), 200
-    if not TINK_CLIENT_SECRET:
-        return jsonify({"error": "Tink credentials are incomplete"}), 503
     if TINK_ENV not in {"sandbox", "production"}:
         return jsonify({"error": "TINK_ENV must be sandbox or production"}), 500
 
@@ -248,31 +246,16 @@ def tink_auth_url():
     if not isinstance(currency, str) or len(currency) != 3 or not currency.isalpha():
         return jsonify({"error": "Invalid currency"}), 400
     currency = currency.upper()
-
-    try:
-        client_token_response = requests.post(
-            TINK_TOKEN_URL,
-            data={
-                "grant_type": "client_credentials",
-                "client_id": TINK_CLIENT_ID,
-                "client_secret": TINK_CLIENT_SECRET,
-                "scope": "accounts:read,transactions:read",
-            },
-            timeout=10,
-        )
-        client_token_response.raise_for_status()
-        client_token = client_token_response.json().get("access_token")
-        if not client_token:
-            raise ValueError("Missing client access token")
-    except (requests.RequestException, ValueError) as exc:
-        status_code = getattr(getattr(exc, "response", None), "status_code", None)
-        logging.warning("Tink client token request failed (HTTP %s)", status_code or "unknown")
-        return jsonify({"error": "Tink authorization setup failed"}), 502
+    bank_name = request_data.get("provider", "Revolut")
+    if not isinstance(bank_name, str) or len(bank_name) > 80:
+        return jsonify({"error": "Invalid bank provider"}), 400
+    bank_name = bank_name.strip() or "Revolut"
 
     signed_state = _tink_state_serializer().dumps({
         "nonce": secrets.token_urlsafe(24),
         "rent": rent,
         "currency": currency,
+        "bank_name": bank_name,
         "environment": TINK_ENV,
     })
     query = urlencode({
@@ -313,6 +296,7 @@ def tink_callback():
     try:
         rent = float(state_data["rent"])
         currency = str(state_data["currency"]).upper()
+        bank_name = str(state_data.get("bank_name") or "Revolut")[:80]
         if state_data.get("environment") != TINK_ENV:
             return jsonify({"error": "Tink environment changed during authorization"}), 400
     except (KeyError, TypeError, ValueError):
@@ -354,11 +338,11 @@ def tink_callback():
         return jsonify({"error": f"Currency mismatch: rent is {currency}; automatic FX conversion is not configured"}), 422
 
     result = calculate_buoyancis_score(transactions, rent)
-    provider_name = "Tink Sandbox" if TINK_ENV == "sandbox" else "Tink"
+    provider_name = f"Tink AISP - {bank_name}"
     payload = _build_signed_payload(
         result,
         provider_name,
-        f"{provider_name} AISP Verified",
+        "Tink AISP Verified",
         currency,
         include_logs=False,
     )
